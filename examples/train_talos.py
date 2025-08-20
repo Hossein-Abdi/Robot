@@ -129,17 +129,21 @@ while True:
                 returns_tensor = torch.tensor(return_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, 1)
                 timesteps_tensor = torch.tensor(timesteps, dtype=torch.long, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN)
 
-                _, action_preds, _ = model(
+                _, (action_pred_mean, action_pred_logstd), _ = model(
                     states=states_tensor,
                     actions=actions_tensor,
                     rewards=rewards_tensor,
                     returns_to_go=returns_tensor,
                     timesteps=timesteps_tensor,
                     attention_mask=torch.ones(BATCH_SIZE, TRAJECTORY_LEN, device=device),
-                    return_dict=False
+                    # return_dict=False
                 )
 
-                loss = loss_fcn(action_preds,actions_tensor)
+                # action_pred_mean, action_pred_logstd = action_pred_mean_logstd
+                action_pred_dist = torch.distributions.normal.Normal(action_pred_mean,torch.exp(action_pred_logstd))
+                action_preds = action_pred_dist.rsample() #action_pred_mean
+
+                loss = loss_fcn(action_preds,actions_tensor[:, -1, :])
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -147,8 +151,8 @@ while True:
 
                 running_loss = torch.cat([running_loss, loss.detach().unsqueeze(0)])
                 if counter % LOG_FREQUENCY == 0:
-                    torch.save(running_loss, result_dir + 'loss_adam.pth')
-                print(f"Epoch {epoch} | Loss: {running_loss[-1].item():.4f}")
+                    torch.save(running_loss, result_dir + 'loss_talos_adam.pth')
+            print(f"Epoch {epoch} | Loss: {running_loss[-1].item():.4f}")
 
             print("-------------------------")
 

@@ -39,7 +39,7 @@ import algorithm.memory as memory
  
 # Define robot and scene parameters
 robot_name = "aliengo"   # "aliengo", "mini_cheetah", "go2", "hyqreal", ...
-scene_name = "flat" #"random_boxes"
+scene_name = "ramp" #"flat" #"random_boxes" "ramp" #"perlin" #"stairs" #"flat" #"random_boxes"
 robot_feet_geom_names = dict(FR='FR',FL='FL', RR='RR' , RL='RL')
 robot_leg_joints = dict(FR=['FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint', ],
                         FL=['FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint', ],
@@ -177,17 +177,21 @@ while True:
                 returns_tensor = torch.tensor(return_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, 1)
                 timesteps_tensor = torch.tensor(timesteps, dtype=torch.long, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN)
 
-                _, action_preds, _ = model(
+                _, (action_pred_mean, action_pred_logstd), _ = model(
                     states=states_tensor,
                     actions=actions_tensor,
                     rewards=rewards_tensor,
                     returns_to_go=returns_tensor,
                     timesteps=timesteps_tensor,
                     attention_mask=torch.ones(BATCH_SIZE, TRAJECTORY_LEN, device=device),
-                    return_dict=False
+                    # return_dict=False
                 )
 
-                loss = loss_fcn(action_preds,actions_tensor)
+                # action_pred_mean, action_pred_logstd = action_pred_mean_logstd
+                action_pred_dist = torch.distributions.normal.Normal(action_pred_mean,torch.exp(action_pred_logstd))
+                action_preds = action_pred_dist.rsample() #action_pred_mean
+
+                loss = loss_fcn(action_preds,actions_tensor[:, -1, :])
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -196,7 +200,7 @@ while True:
                 running_loss = torch.cat([running_loss, loss.detach().unsqueeze(0)])
                 if counter % LOG_FREQUENCY == 0:
                     torch.save(running_loss, result_dir + 'loss_quad_adam.pth')
-                print(f"Epoch {epoch} | Loss: {running_loss[-1].item():.4f}")
+            print(f"Epoch {epoch} | Loss: {running_loss[-1].item():.4f}")
 
             print("-------------------------")
 

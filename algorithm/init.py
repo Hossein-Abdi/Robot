@@ -25,7 +25,7 @@ result_dir = "/mnt/iusers01/fatpou01/compsci01/x47085ha/scratch/result/"
 BATCH_SIZE = 64 #32 #10
 LEARNING_RATE = 1.0e-5 #1.0e-5
 TRAJECTORY_LEN = 5 #10
-EPOCHS = 10
+EPOCHS = 1 #10
 LOG_FREQUENCY = 100
 STATE_DIM = 227 #talos: 57 #quad aliengo: 227
 ACT_DIM = 12 #talos: 22 #quad aliengo: 12
@@ -46,6 +46,31 @@ reward_seq = np.array([])
 replay_memory = memory.ReplayMemory(10000)
 
 
+## Model ################
+class StochasticDecisionTransformer(DecisionTransformerModel):
+    def __init__(self, config):
+        super().__init__(config)
+        act_dim = config.act_dim
+        
+        self.mean_head = nn.Linear(config.hidden_size, act_dim)
+        self.logstd_head = nn.Linear(config.hidden_size, act_dim)
+        # nn.init.constant_(self.log_std_head.bias, -1.0)  # optional initialization
+        
+    def forward(self, *args, **kwargs):
+        kwargs["output_hidden_states"] = True
+        kwargs["return_dict"] = True
+        out = super().forward(*args, **kwargs)
+        hidden_states = out.hidden_states
+        
+        last_hidden = hidden_states[-1][:, -1, :]
+        
+        mean = self.mean_head(last_hidden)
+        logstd = torch.clamp(self.logstd_head(last_hidden), min=-20, max=2)
+        
+        return out.state_preds, (mean, logstd), out.return_preds
+
+
+
 
 configuration = DecisionTransformerConfig(
     state_dim = STATE_DIM,
@@ -54,7 +79,7 @@ configuration = DecisionTransformerConfig(
     max_ep_len=4096,
     action_tanh=True
 )
-model = DecisionTransformerModel(configuration).to(dtype).to(device)
+model = StochasticDecisionTransformer(configuration).to(dtype).to(device) # DecisionTransformerModel(configuration).to(dtype).to(device)
 
 
 

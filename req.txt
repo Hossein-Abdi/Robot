@@ -1,0 +1,11 @@
+gym-quadruped==1.0.8
+gymnasium==1.2.0
+jax==0.6.2
+jaxlib==0.6.2
+mujoco==3.3.4
+mujoco-mjx==3.3.4
+numpy==2.2.6
+torch==2.7.1
+transformers==4.55.0
+wandb==0.21.0
+git+https://github.com/google/trajax

@@ -29,6 +29,7 @@ EPOCHS = 1 #10
 LOG_FREQUENCY = 100
 STATE_DIM = 227 #talos: 57 #quad aliengo: 227
 ACT_DIM = 12 #talos: 22 #quad aliengo: 12
+ALPHA = 0.1
 
 loss_fcn = nn.MSELoss()
 replay_buffer = memory.ReplayMemory(1000)

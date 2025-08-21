@@ -143,7 +143,9 @@ while True:
                 action_pred_dist = torch.distributions.normal.Normal(action_pred_mean,torch.exp(action_pred_logstd))
                 action_preds = action_pred_dist.rsample() #action_pred_mean
 
-                loss = loss_fcn(action_preds,actions_tensor[:, -1, :])
+                action_pred_entropy = action_pred_dist.entropy().sum(dim=-1)
+
+                loss = loss_fcn(action_preds,actions_tensor[:, -1, :]) - ALPHA * action_pred_entropy.mean()
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()

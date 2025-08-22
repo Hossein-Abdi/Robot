@@ -9,7 +9,7 @@ import jax.numpy as jnp
 # jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
 # jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
 
-
+import pdb
 import numpy as np
 import mujoco
 import mujoco.viewer
@@ -65,7 +65,7 @@ while True:
                 state_vec = np.concatenate([qpos, qvel], axis=-1)
                 # state_vec = jnp.array(state)
                 # state_vec = fcn.flatten_state(state)
-                reward = np.array([0]) # !!!!!!!!
+                reward = fcn.reward_talos(qpos[0], 1.) # !!!!!!!!
                 transition = (reward, state_vec, action_vec)
                 
                 if len(trajectory_seq) < TRAJECTORY_LEN:

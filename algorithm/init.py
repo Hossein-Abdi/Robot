@@ -11,6 +11,7 @@ import algorithm.memory as memory
 import algorithm.models
 # from algorithm.decision_transformer.models.decision_transformer import DecisionTransformer
 from transformers import DecisionTransformerConfig, DecisionTransformerModel
+from sophia import SophiaG
 
 
 
@@ -20,7 +21,7 @@ from transformers import DecisionTransformerConfig, DecisionTransformerModel
 
 device = torch.device('cuda')
 dtype = torch.float32
-result_dir = "/mnt/iusers01/fatpou01/compsci01/x47085ha/scratch/result/"
+result_dir = "/home/satya/Robot/result/"
 
 BATCH_SIZE = 64 #32 #10
 LEARNING_RATE = 1.0e-5 #1.0e-5
@@ -85,7 +86,7 @@ model = StochasticDecisionTransformer(configuration).to(dtype).to(device) # Deci
 
 
 ## Optimizer ################
-optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+optimizer = SophiaG(model.parameters(), lr=LEARNING_RATE)
 #########################################
 
 

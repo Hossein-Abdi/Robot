@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(dir_path, '..')))
 import jax.numpy as jnp
 import jax
 import mujoco
-
+import pdb
 # Update JAX configuration
 # jax.config.update("jax_compilation_cache_dir", "./jax_cache")
 # jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
@@ -34,7 +34,9 @@ from algorithm.init import *
 import algorithm.fcn as fcn
 import algorithm.memory as memory
 
-
+class RewQuadrupedEnv(QuadrupedEnv):
+    def _compute_reward(self):
+        return 10*(self.mjData.qpos[0] - 1.)
 
  
 # Define robot and scene parameters
@@ -46,11 +48,13 @@ robot_leg_joints = dict(FR=['FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint', ]
                         RR=['RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint', ],
                         RL=['RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint'])
 mpc_frequency = config.mpc_frequency
-state_observables_names = tuple(QuadrupedEnv.ALL_OBS)  # return all available state observables
- 
+state_observables_names = tuple(RewQuadrupedEnv.ALL_OBS)  # return all available state observables
+
+
+
 # Initialize simulation environment
 sim_frequency = 200.0
-env = QuadrupedEnv(robot=robot_name,
+env = RewQuadrupedEnv(robot=robot_name,
                    scene=scene_name,
                    sim_dt = 1/sim_frequency,  # Simulation time step [s]
                    ref_base_lin_vel=0.0, # Constant magnitude of reference base linear velocity [m/s]
@@ -122,7 +126,7 @@ while True:
                     replay_memory.push(trajectory_seq)
                     trajectory_seq =  []
                 #########################################################################
-
+                # reward = fcn.reward(state["base_pos"][0], 10.)
                 state, reward, is_terminated, is_truncated, info = env.step(action=tau + tau_fb)
                 counter += 1
         start = timer()
@@ -200,7 +204,7 @@ while True:
 
                 running_loss = torch.cat([running_loss, loss.detach().unsqueeze(0)])
                 if counter % LOG_FREQUENCY == 0:
-                    torch.save(running_loss, result_dir + 'loss_quad_adam.pth')
+                    torch.save(running_loss, result_dir + 'loss_quad_sophia.pth')
             print(f"Epoch {epoch} | Loss: {running_loss[-1].item():.4f}")
 
             print("-------------------------")

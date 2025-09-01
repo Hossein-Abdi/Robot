@@ -531,7 +531,7 @@ def parallel_filter_line_search(
         V_new = V_in + alpha * dV
 
         # Evaluate at new point
-        new_cost, new_c = model_evaluator(X_new, U_new)
+        new_cost, new_c, new_cost_arr = model_evaluator(X_new, U_new)
         theta_new = np.sum(new_c * new_c)  # Constraint violation measure
         phi_new = new_cost
 
@@ -593,7 +593,7 @@ def model_evaluator_helper(cost, dynamics,x0, X, U):
     residual_fn = lambda t: dynamics(X[t], U[t], t) - X[t + 1]
     c = np.vstack([x0 - X[0], vmap(residual_fn)(np.arange(T))])
 
-    return g, c
+    return g, c, costs
 @partial(jit, static_argnums=(0,1,2,3))
 def mpc(
     cost,
@@ -616,7 +616,7 @@ def mpc(
         _hessian_approx = None
     _dynamics = partial(dynamics,parameter=parameter)
     model_evaluator = partial(model_evaluator_helper, _cost, _dynamics,x0)
-    g, c = model_evaluator(X_in, U_in)
+    g, c, cost_arr = model_evaluator(X_in, U_in)
     dX,dU, dV, q, r = compute_search_direction(
             _cost,
             _dynamics,
@@ -674,7 +674,7 @@ def mpc(
     q,
     r,)
 
-    return X_new, U_new, V_new
+    return X_new, U_new, V_new, cost_arr
 
 @partial(jit, static_argnums=(0,1,2,3,4,5))
 def al_mpc(

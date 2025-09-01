@@ -13,7 +13,7 @@ import algorithm.models
 from transformers import DecisionTransformerConfig, DecisionTransformerModel
 from sophia import SophiaG
 
-
+import pdb
 
 
 
@@ -23,15 +23,16 @@ device = torch.device('cuda')
 dtype = torch.float32
 result_dir = "/home/satya/Robot/result/"
 
-BATCH_SIZE = 64 #32 #10
+BATCH_SIZE = 32 #32 #10
 LEARNING_RATE = 1.0e-5 #1.0e-5
-TRAJECTORY_LEN = 5 #10
+TRAJECTORY_LEN = 25 #10
 EPOCHS = 1 #10
 LOG_FREQUENCY = 100
-STATE_DIM = 227 #talos: 57 #quad aliengo: 227
+STATE_DIM = 61 #talos: 57 #quad aliengo: 227
 ACT_DIM = 12 #talos: 22 #quad aliengo: 12
 ALPHA = 0.1
-
+TARGET_ENTROPY = 0.2
+GAMMA = 0.99
 loss_fcn = nn.MSELoss()
 replay_buffer = memory.ReplayMemory(1000)
 running_loss = torch.tensor([], dtype=dtype, device=device)
@@ -62,12 +63,26 @@ class StochasticDecisionTransformer(DecisionTransformerModel):
         kwargs["output_hidden_states"] = True
         kwargs["return_dict"] = True
         out = super().forward(*args, **kwargs)
-        hidden_states = out.hidden_states
+        # hidden_states = out.hidden_states
+        # print(out.last_hidden_state.shape)
+        last_hidden_action = out.last_hidden_state.reshape(BATCH_SIZE, TRAJECTORY_LEN, 3, self.hidden_size).permute(0, 2, 1, 3)[:, 1]
+        # pdb.set_trace()
+        mean = self.mean_head(last_hidden_action)
+        logstd = torch.clamp(self.logstd_head(last_hidden_action), min=-20, max=2)
         
-        last_hidden = hidden_states[-1][:, -1, :]
-        
-        mean = self.mean_head(last_hidden)
-        logstd = torch.clamp(self.logstd_head(last_hidden), min=-20, max=2)
+        return out.state_preds, (mean, logstd), out.return_preds
+
+    def evaluate(self, traj_len, *args, **kwargs):
+        kwargs["output_hidden_states"] = True
+        kwargs["return_dict"] = True
+        out = super().forward(*args, **kwargs)
+        # hidden_states = out.hidden_states
+        # print(out.last_hidden_state.shape)
+        last_hidden_action = out.last_hidden_state.reshape(1, traj_len, 3, self.hidden_size).permute(0, 2, 1, 3)[:, 1]
+        # print(last_hidden_action.shape)
+        last_hidden_action = last_hidden_action[:, [-1], :]
+        mean = self.mean_head(last_hidden_action)
+        logstd = torch.clamp(self.logstd_head(last_hidden_action), min=-20, max=2)
         
         return out.state_preds, (mean, logstd), out.return_preds
 

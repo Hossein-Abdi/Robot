@@ -19,7 +19,7 @@ from functools import partial
 from gym_quadruped.quadruped_env import QuadrupedEnv
 import copy
 from gym_quadruped.utils.mujoco.visual import render_sphere, render_vector
- 
+import pdb
 import utils.mpc_wrapper as mpc_wrapper
 import config.config_aliengo as config
 
@@ -34,9 +34,35 @@ from algorithm.init import *
 import algorithm.fcn as fcn
 import algorithm.memory as memory
 
+def compute_returns_to_go_batch(reward_batch: torch.Tensor, gamma: float = 0.99) -> torch.Tensor:
+    """
+    Compute discounted returns-to-go for a batch of reward sequences.
+
+    Args:
+        reward_batch: [B, T] tensor of rewards
+        gamma: discount factor
+
+    Returns:
+        returns: [B, T] tensor of returns-to-go
+    """
+    B, T = reward_batch.shape
+    returns = torch.zeros_like(reward_batch)
+    running_return = torch.zeros(B, dtype=reward_batch.dtype, device=reward_batch.device)
+    for t in reversed(range(T)):
+        running_return = reward_batch[:, t] + gamma * running_return
+        returns[:, t] = running_return
+    return returns
+
 class RewQuadrupedEnv(QuadrupedEnv):
     def _compute_reward(self):
-        return 10*(self.mjData.qpos[0] - 1.)
+        lin_rew = np.sum(np.exp(-self.base_lin_vel_err()))
+        ang_rew = np.sum(np.exp(-self.base_ang_vel_err()))
+        torque_penalty = 0.1 * (np.sum(self.mjData.ctrl >= config.max_torque) + np.sum(self.mjData.ctrl <= config.min_torque))
+        work_penalty = 0.01 * self.work
+        # 10*(self.mjData.qpos[0] - 1.)
+        # print(lin_rew, ang_rew, torque_penalty, work_penalty)
+        return lin_rew+ang_rew-torque_penalty-work_penalty
+
 
  
 # Define robot and scene parameters
@@ -115,23 +141,29 @@ while True:
 
                 tau_fb = 10*(q-qpos[7:7+config.n_joints]) -2*(qvel[6:6+config.n_joints])
 
-                ## rolling out: #########################################################
-                action_vec = tau + tau_fb
-                state_vec = fcn.flatten_state(state)
-                transition = (reward, state_vec, action_vec)
-                
-                if len(trajectory_seq) < TRAJECTORY_LEN:
-                    trajectory_seq.append(transition)
-                else:
-                    replay_memory.push(trajectory_seq)
-                    trajectory_seq =  []
-                #########################################################################
                 # reward = fcn.reward(state["base_pos"][0], 10.)
                 state, reward, is_terminated, is_truncated, info = env.step(action=tau + tau_fb)
+                observation = torch.tensor(np.concatenate([
+                                state['base_pos'],
+                                state['base_ori_quat_wxyz'],
+                                state['qpos_js'],
+                                state['base_lin_vel'],
+                                state['base_ang_vel'],
+                                state['qvel_js'],
+                                state['feet_pos'],
+                                state['contact_forces']]),dtype=torch.float32)
+                # if counter % 100 == 0:
+                # pdb.set_trace()
                 counter += 1
         start = timer()
-        tau, q, dq = mpc.run(qpos,qvel,input,contact)   
-        stop = timer()
+        tau, q, dq, X, U, stage_cost = mpc.run(qpos,qvel,input,contact)
+        # pdb.set_trace()
+        ## rolling out: #########################################################
+        trajectory_seq = (-stage_cost[:-1], X[:-1], U)
+        replay_memory.push(trajectory_seq)
+        #########################################################################
+        # pdb.set_trace()   
+        # stop = timer()
         # print("Time taken for MPC: ", stop-start)   
 
         stop = timer()
@@ -167,18 +199,25 @@ while True:
                 #         reward_seq_batch.append(trans[0])  
                 #         state_seq_batch.append(trans[1])   
                 #         action_seq_batch.append(trans[2])
-
-                reward_seq_batch, state_seq_batch, action_seq_batch = zip(*[
-                    trans for traj in trajectory_batch for trans in traj
-                ])
+                # pdb.set_trace()
+                # reward_seq_batch, state_seq_batch, action_seq_batch = zip(*[
+                #     trans for traj in trajectory_batch for trans in traj
+                # ])
+                reward_seq_batch, state_seq_batch, action_seq_batch = zip(*trajectory_batch)
+                rewards_tensor = torch.stack([torch.from_numpy(np.array(r)) for r in reward_seq_batch]).to(device=device, dtype=dtype)
+                states_tensor = torch.stack([torch.from_numpy(np.array(r)) for r in state_seq_batch]).to(device=device, dtype=dtype)
+                actions_tensor = torch.stack([torch.from_numpy(np.array(r)) for r in action_seq_batch]).to(device=device, dtype=dtype)
+                # pdb.set_trace()
 
                 timesteps = torch.arange(TRAJECTORY_LEN).repeat(BATCH_SIZE)
-                return_seq_batch = reward_seq_batch #!!!!!!!!
-
-                states_tensor = torch.tensor(state_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, STATE_DIM)
-                actions_tensor = torch.tensor(action_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, ACT_DIM)
-                rewards_tensor = torch.tensor(reward_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, 1)
-                returns_tensor = torch.tensor(return_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, 1)
+                # return_seq_batch = reward_seq_batch #!!!!!!!!
+                returns_tensor = compute_returns_to_go_batch(rewards_tensor, gamma=GAMMA)
+                rewards_tensor = rewards_tensor.unsqueeze(-1)
+                returns_tensor = returns_tensor.unsqueeze(-1)
+                # states_tensor = torch.tensor(state_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, STATE_DIM)
+                # actions_tensor = torch.tensor(action_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, ACT_DIM)
+                # rewards_tensor = torch.tensor(reward_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, 1)
+                # returns_tensor = torch.tensor(return_seq_batch, dtype=dtype, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN, 1)
                 timesteps_tensor = torch.tensor(timesteps, dtype=torch.long, device=device).reshape(BATCH_SIZE, TRAJECTORY_LEN)
 
                 _, (action_pred_mean, action_pred_logstd), _ = model(
@@ -190,14 +229,18 @@ while True:
                     attention_mask=torch.ones(BATCH_SIZE, TRAJECTORY_LEN, device=device),
                     # return_dict=False
                 )
+                # if counter % 100 == 0:
+                # pdb.set_trace()
 
                 # action_pred_mean, action_pred_logstd = action_pred_mean_logstd
+                # pdb.set_trace()
+                # action_pred_mean_reshaped = action_pred_mean
                 action_pred_dist = torch.distributions.normal.Normal(action_pred_mean,torch.exp(action_pred_logstd))
                 action_preds = action_pred_dist.rsample() #action_pred_mean
 
                 action_pred_entropy = action_pred_dist.entropy().sum(dim=-1)
-
-                loss = loss_fcn(action_preds,actions_tensor[:, -1, :]) - ALPHA * action_pred_entropy.mean()
+                nllloss = - action_pred_dist.log_prob(actions_tensor)
+                loss = nllloss.sum(dim=-1).mean() + ALPHA * (TARGET_ENTROPY - action_pred_entropy.mean())
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()

@@ -343,7 +343,7 @@ class MPCControllerWrapper:
         )
 
         # Execute the MPC optimization.
-        X, U, V = self._solve(
+        X, U, V, stage_cost = self._solve(
             reference,
             parameter,
             self.config.W,
@@ -361,8 +361,10 @@ class MPCControllerWrapper:
         tau = np.clip(np.array(tau_temp),self.config.min_torque,self.config.max_torque)
         q = np.array(q_temp)
         dq = np.array(dq_temp)
+        # import pdb
+        # pdb.set_trace()
 
-        return tau, q, dq 
+        return tau, q, dq, X, U, stage_cost
 
     def reset(self,qpos,qvel):
         """

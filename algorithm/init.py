@@ -67,7 +67,7 @@ class StochasticDecisionTransformer(DecisionTransformerModel):
         # print(out.last_hidden_state.shape)
         last_hidden_action = out.last_hidden_state.reshape(BATCH_SIZE, TRAJECTORY_LEN, 3, self.hidden_size).permute(0, 2, 1, 3)[:, 1]
         # pdb.set_trace()
-        mean = self.mean_head(last_hidden_action)
+        mean = torch.clamp(self.mean_head(last_hidden_action), min=-50., max=50.)
         logstd = torch.clamp(self.logstd_head(last_hidden_action), min=-20, max=2)
         
         return out.state_preds, (mean, logstd), out.return_preds
@@ -81,7 +81,7 @@ class StochasticDecisionTransformer(DecisionTransformerModel):
         last_hidden_action = out.last_hidden_state.reshape(1, traj_len, 3, self.hidden_size).permute(0, 2, 1, 3)[:, 1]
         # print(last_hidden_action.shape)
         last_hidden_action = last_hidden_action[:, [-1], :]
-        mean = self.mean_head(last_hidden_action)
+        mean = torch.clamp(self.mean_head(last_hidden_action), min=-50., max=50.)
         logstd = torch.clamp(self.logstd_head(last_hidden_action), min=-20, max=2)
         
         return out.state_preds, (mean, logstd), out.return_preds

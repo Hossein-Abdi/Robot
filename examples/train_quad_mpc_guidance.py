@@ -98,10 +98,12 @@ class MPCGuidanceAgent:
             "batch_size": 32,
             "learning_rate": 1.0e-5,
             "learning_starts":1000,
+            "train_freq": 200,
+            "eval_freq": 2000,
             "num_minibatch_updates": 16,
             "trajectory_len": 25,
             "epochs": 1,
-            "log_frequency": 100,
+            # "log_frequency": 100,
             "state_dim": 61,
             "act_dim": 12,
             "alpha": 0.1,
@@ -133,6 +135,7 @@ class MPCGuidanceAgent:
         
         # Training tracking
         self.running_loss = torch.tensor([], dtype=self.dtype, device=self.device)
+        self.running_entropy = torch.tensor([], dtype=self.dtype, device=self.device)
         
         # Environment and MPC will be set externally
         self.env = None
@@ -260,7 +263,8 @@ class MPCGuidanceAgent:
                     action_pred_dist = torch.distributions.normal.Normal(action_pred_mean, torch.exp(action_pred_logstd))
                     action_pred_entropy = action_pred_dist.entropy().sum(dim=-1)
                     nllloss = -action_pred_dist.log_prob(actions_tensor)
-                    loss = nllloss.sum(dim=-1).mean() + self.cfg["alpha"] * (self.cfg["target_entropy"] - action_pred_entropy.mean())
+                    mean_entropy = action_pred_entropy.mean()
+                    loss = nllloss.sum(dim=-1).mean() + self.cfg["alpha"] * (self.cfg["target_entropy"] - mean_entropy)
                     
                     # Backward pass
                     self.optimizer.zero_grad()
@@ -268,8 +272,9 @@ class MPCGuidanceAgent:
                     nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg["grad_norm"], norm_type=2.0)
                     self.optimizer.step()
                     
-                    # Track loss
+                    # Track loss & entropy
                     self.running_loss = torch.cat([self.running_loss, loss.detach().unsqueeze(0)])
+                    self.running_entropy = torch.cat([self.running_entropy, mean_entropy.detach().unsqueeze(0)])
                 
             # print(f"Epoch {epoch} | Loss: {self.running_loss[-1].item():.4f}")
             
@@ -278,7 +283,8 @@ class MPCGuidanceAgent:
         torch.save({
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-            'loss': self.running_loss
+            'loss': self.running_loss,
+            'entropy': self.running_entropy,
         }, path)
         
     def load_model(self, path):
@@ -291,6 +297,7 @@ class MPCGuidanceAgent:
     def save_loss(self):
         """Save loss history"""
         torch.save(self.running_loss, self.cfg["result_dir"] + 'loss_quad_mpc_guidance.pth')
+        torch.save(self.running_entropy, self.cfg["result_dir"] + 'ent_quad_mpc_guidance.pth')
 
 def main():
     """Main training loop"""
@@ -418,11 +425,14 @@ def main():
         # Training
         if counter >= agent.cfg["learning_starts"] and len(agent.replay_memory) > agent.cfg["batch_size"]:
             # print(counter)
-            agent.update()
-            
-            if counter % agent.cfg["log_frequency"] == 0:
+            if counter % agent.cfg["train_freq"] = 0:
+                agent.update()
                 agent.save_loss()
-                print(f"Step {counter} | Memory size: {len(agent.replay_memory)} | Latest loss: {agent.running_loss[-1].item():.4f}")
+                print(f"Step {counter} | Memory size: {len(agent.replay_memory)} | Latest loss: {agent.running_loss[-1].item():.4f} | Latest Entropy: {agent.running_entropy[-1].item():.4f}")
+            
+            # if counter % agent.cfg["log_frequency"] == 0:
+            #     agent.save_loss()
+            #     print(f"Step {counter} | Memory size: {len(agent.replay_memory)} | Latest loss: {agent.running_loss[-1].item():.4f}")
         
         # # Optional: Add termination condition
         # if counter > agent.cfg["timesteps"]:  # Example termination condition

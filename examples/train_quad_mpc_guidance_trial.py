@@ -66,7 +66,7 @@ class RewQuadrupedEnv(QuadrupedEnv):
         ang_rew = np.sum(np.exp(-self.base_ang_vel_err()))
         torque_penalty = 0.1 * (np.sum(self.mjData.ctrl >= config.max_torque) + np.sum(self.mjData.ctrl <= config.min_torque))
         work_penalty = 0.01 * self.work
-        return 0.1 * ( lin_rew+ang_rew - torque_penalty - 0.01 * work_penalty)
+        return 0.1 * ( lin_rew + ang_rew - torque_penalty - 0.01 * work_penalty)
 
 # class StochasticDecisionTransformer(DecisionTransformerModel):
 #     def __init__(self, config):
@@ -106,10 +106,11 @@ class MPCGuidanceAgent:
             "learning_starts":1000,
             "train_freq": 10,
             "eval_freq": 1000,
+            "num_eval_eps": 10,
             "num_minibatch_updates": 16,
             "trajectory_len": 25,
             "epochs": 1,
-            "log_frequency": 100,
+            "log_frequency": 200,
             "state_dim": 61,
             "act_dim": 12,
             "alpha": 2e-3,
@@ -529,7 +530,7 @@ def main():
                 print(f"Train Step {counter} | Memory size: {len(agent.replay_memory)} | Latest loss: {agent.running_loss[-1].item():.4f} | Latest Entropy: {agent.running_entropy[-1].item():.4f}")
 
             if counter % agent.cfg["eval_freq"] == 0:
-                agent.evaluate_agent(num_episodes=10)
+                agent.evaluate_agent(num_episodes=agent.cfg["num_eval_eps"])
         
         # # Optional: Add termination condition
         # if counter > agent.cfg["timesteps"]:  # Example termination condition

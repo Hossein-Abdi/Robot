@@ -62,34 +62,12 @@ def compute_returns_to_go_batch(reward_batch: torch.Tensor, gamma: float = 0.99)
 
 class RewQuadrupedEnv(QuadrupedEnv):
     def _compute_reward(self):
-        lin_rew = np.sum(np.exp(-self.base_lin_vel_err()))
-        ang_rew = np.sum(np.exp(-self.base_ang_vel_err()))
+        lin_rew = 0.1 * np.sum(np.exp(-self.base_lin_vel_err()))
+        ang_rew = 0.1 * np.sum(np.exp(-self.base_ang_vel_err()))
         torque_penalty = 0.1 * (np.sum(self.mjData.ctrl >= config.max_torque) + np.sum(self.mjData.ctrl <= config.min_torque))
         work_penalty = 0.01 * self.work
-        return 0.1 * ( lin_rew + ang_rew - torque_penalty - 0.01 * work_penalty)
+        return 0.1 * ( lin_rew + ang_rew - 0.1 * torque_penalty - 0.1 * work_penalty)
 
-# class StochasticDecisionTransformer(DecisionTransformerModel):
-#     def __init__(self, config):
-#         super().__init__(config)
-#         act_dim = config.act_dim
-        
-#         self.mean_head = nn.Linear(config.hidden_size, act_dim)
-#         self.logstd_head = nn.Linear(config.hidden_size, act_dim)
-        
-#     def forward(self, *args, **kwargs):
-#         kwargs["output_hidden_states"] = True
-#         kwargs["return_dict"] = True
-#         out = super().forward(*args, **kwargs)
-        
-#         batch_size = out.last_hidden_state.shape[0]
-#         trajectory_len = out.last_hidden_state.shape[1] // 3
-        
-#         last_hidden_action = out.last_hidden_state.reshape(batch_size, trajectory_len, 3, self.hidden_size).permute(0, 2, 1, 3)[:, 1]
-        
-#         mean = self.mean_head(last_hidden_action)
-#         logstd = torch.clamp(self.logstd_head(last_hidden_action), min=-20, max=2)
-        
-#         return out.state_preds, (mean, logstd), out.return_preds
 
 class MPCGuidanceAgent:
     def __init__(self, config_dict=None):

@@ -53,13 +53,11 @@ class OurGymnasiumWrapper(GymnasiumWrapper):
 
 class RewQuadrupedEnv(QuadrupedEnv):
     def _compute_reward(self):
-        lin_rew = np.sum(np.exp(-self.base_lin_vel_err()))
-        ang_rew = np.sum(np.exp(-self.base_ang_vel_err()))
+        lin_rew = 0.1 * np.sum(np.exp(-self.base_lin_vel_err()))
+        ang_rew = 0.1 * np.sum(np.exp(-self.base_ang_vel_err()))
         torque_penalty = 0.1 * (np.sum(self.mjData.ctrl >= config.max_torque) + np.sum(self.mjData.ctrl <= config.min_torque))
         work_penalty = 0.01 * self.work
-        # 10*(self.mjData.qpos[0] - 1.)
-        # print(lin_rew, ang_rew, torque_penalty, work_penalty)
-        return lin_rew+ang_rew-torque_penalty-work_penalty
+        return 0.1 * ( lin_rew + ang_rew - 0.1 * torque_penalty - 0.1 * work_penalty)
 
 
 # seed for reproducibility
@@ -151,7 +149,7 @@ SAC_QUADRUPED_CONFIG = {
     "gradient_steps": 1,            # gradient steps
     "batch_size": 64,               # training batch size
 
-    "discount_factor": 0.99,        # discount factor (gamma)
+    "discount_factor": 0.995,       # discount factor (gamma)
     "polyak": 0.005,                # soft update hyperparameter (tau)
 
     "actor_learning_rate": 2e-5,    # actor learning rate
@@ -162,24 +160,24 @@ SAC_QUADRUPED_CONFIG = {
     "state_preprocessor": None,             # state preprocessor class (see skrl.resources.preprocessors)
     "state_preprocessor_kwargs": {},        # state preprocessor's kwargs (e.g. {"size": env.observation_space})
 
-    "random_timesteps": 0,          # random exploration steps
-    "learning_starts": 0,           # learning starts after this many steps
+    "random_timesteps": 0,                  # random exploration steps
+    "learning_starts": 1000,                # learning starts after this many steps
 
-    "grad_norm_clip": 0,            # clipping coefficient for the norm of the gradients
+    "grad_norm_clip": 1.,                   # clipping coefficient for the norm of the gradients
 
-    "learn_entropy": True,          # learn entropy
-    "entropy_learning_rate": 1e-4,  # entropy learning rate
-    "initial_entropy_value": 0.1,   # initial entropy value
-    "target_entropy": None,         # target entropy
+    "learn_entropy": False,                 # learn entropy
+    "entropy_learning_rate": 1e-3,          # entropy learning rate
+    "initial_entropy_value": 0.1,           # initial entropy value
+    "target_entropy": None,                 # target entropy
 
-    "rewards_shaper": None,         # rewards shaping function: Callable(reward, timestep, timesteps) -> reward
+    "rewards_shaper": None,                 # rewards shaping function: Callable(reward, timestep, timesteps) -> reward
 
-    "mixed_precision": False,       # enable automatic mixed precision for higher performance
+    "mixed_precision": False,               # enable automatic mixed precision for higher performance
 
     "experiment": {
-        "directory": "",            # experiment's parent directory
-        "experiment_name": "",      # experiment name
-        "write_interval": "auto",   # TensorBoard writing interval (timesteps)
+        "directory": "",                    # experiment's parent directory
+        "experiment_name": "",              # experiment name
+        "write_interval": "auto",           # TensorBoard writing interval (timesteps)
 
         "checkpoint_interval": "auto",      # interval for checkpoints (timesteps)
         "store_separately": False,          # whether to store checkpoints separately
@@ -189,13 +187,9 @@ SAC_QUADRUPED_CONFIG = {
     }
 }
 cfg = SAC_QUADRUPED_CONFIG.copy()
-cfg["discount_factor"] = 0.99
-cfg["batch_size"] = 64
 cfg["random_timesteps"] = 0
-cfg["learning_starts"] = 1000
-cfg["learn_entropy"] = True
 # logging to TensorBoard and write checkpoints (in timesteps)
-cfg["experiment"]["write_interval"] = 75
+cfg["experiment"]["write_interval"] = 200
 cfg["experiment"]["checkpoint_interval"] = 1000000
 cfg["experiment"]["directory"] = "runs/torch/QuadrupedEnv"
 
@@ -208,7 +202,7 @@ agent = SAC(models=models,
 
 
 # configure and instantiate the RL trainer
-cfg_trainer = {"timesteps": 100000, "headless": True}
+cfg_trainer = {"timesteps": 1000000, "headless": True}
 trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=[agent])
 
 # start training

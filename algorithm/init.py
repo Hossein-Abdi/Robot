@@ -23,7 +23,7 @@ device = torch.device('cuda')
 dtype = torch.float32
 result_dir = "/home/satya/Robot/result/"
 
-BATCH_SIZE = 32 #32 #10
+BATCH_SIZE = 64 #32 #10
 LEARNING_RATE = 1.0e-5 #1.0e-5
 TRAJECTORY_LEN = 25 #10
 EPOCHS = 1 #10

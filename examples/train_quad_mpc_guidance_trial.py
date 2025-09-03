@@ -66,7 +66,7 @@ class RewQuadrupedEnv(QuadrupedEnv):
         ang_rew = np.sum(np.exp(-self.base_ang_vel_err()))
         torque_penalty = 0.1 * (np.sum(self.mjData.ctrl >= config.max_torque) + np.sum(self.mjData.ctrl <= config.min_torque))
         work_penalty = 0.01 * self.work
-        return 0.1 * ( lin_rew+ang_rew - torque_penalty - 0.1 * work_penalty)
+        return 0.1 * ( lin_rew+ang_rew - torque_penalty - 0.01 * work_penalty)
 
 # class StochasticDecisionTransformer(DecisionTransformerModel):
 #     def __init__(self, config):
@@ -101,8 +101,8 @@ class MPCGuidanceAgent:
         # Default configuration
         self.cfg = {
             "timesteps": 1000000,
-            "batch_size": 32,
-            "learning_rate": 8.0e-5,
+            "batch_size": 64,
+            "learning_rate": 2.0e-5,
             "learning_starts":1000,
             "train_freq": 10,
             "eval_freq": 1000,

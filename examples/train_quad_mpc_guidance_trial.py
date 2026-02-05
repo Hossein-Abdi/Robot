@@ -17,12 +17,12 @@ import utils.mpc_wrapper as mpc_wrapper
 import config.config_aliengo as config
 from timeit import default_timer as timer
 import pdb
-sys.path.append("algorithm")
+# sys.path.append("algorithm")
 import algorithm.fcn as fcn
 import algorithm.memory as memory
 from algorithm.init import StochasticDecisionTransformer
 from transformers import DecisionTransformerConfig, DecisionTransformerModel
-from sophia import SophiaG
+from algorithm.guro import GuRO
 
 def sanity_check_output_tensor(tensor, dim):
     mask = ~torch.isnan(tensor).any(dim=dim)   # [32, 25] → True if row has no NaN
@@ -100,7 +100,7 @@ class MPCGuidanceAgent:
             "max_ep_len": 128, #4096
             "device": "cuda" if torch.cuda.is_available() else "cpu",
             "dtype": torch.float32,
-            "result_dir": "/home/satya/Robot/result/"
+            "result_dir": os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "result") #"/home/satya/Robot/result/"
         }
         
         if config_dict:
@@ -117,7 +117,7 @@ class MPCGuidanceAgent:
         
         # Initialize optimizer
         # self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.cfg["learning_rate"])
-        self.optimizer = SophiaG(self.model.parameters(), lr=self.cfg["learning_rate"])
+        self.optimizer = GuRO(self.model.parameters(), lr=self.cfg["learning_rate"])
         
         # Training tracking
         self.running_loss = torch.tensor([], dtype=self.dtype, device=self.device)

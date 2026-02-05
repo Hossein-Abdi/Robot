@@ -11,7 +11,6 @@ import algorithm.memory as memory
 import algorithm.models
 # from algorithm.decision_transformer.models.decision_transformer import DecisionTransformer
 from transformers import DecisionTransformerConfig, DecisionTransformerModel
-from sophia import SophiaG
 
 import pdb
 
@@ -19,7 +18,15 @@ import pdb
 
 
 
-device = torch.device('cuda')
+if torch.cuda.is_available():
+    device = torch.device("cuda:0")
+elif torch.cuda.is_available():
+    device = torch.device("cuda:1")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
 dtype = torch.float32
 result_dir = "/home/satya/Robot/result/"
 
@@ -99,52 +106,4 @@ configuration = DecisionTransformerConfig(
     action_tanh=True
 )
 model = StochasticDecisionTransformer(configuration).to(dtype).to(device) # DecisionTransformerModel(configuration).to(dtype).to(device)
-
-
-
-## Optimizer ################
-optimizer = SophiaG(model.parameters(), lr=LEARNING_RATE)
-#########################################
-
-
-
-
-
-
-# config = torchrl.modules.DecisionTransformer.default_config()
-# model = torchrl.modules.DecisionTransformer(state_dim=4, action_dim=2, config=config).to(dtype).to(device)
-
-
-
-# model = models.DecisionTransformer(
-#         d_s=STATE_DIM,
-#         d_a=ACT_DIM,
-#         d_model=100,
-#         nhead=1,
-#         num_encoder_layers=1,
-#         dropout=0.1
-#     ).to(dtype).to(device)
-
-
-
-# model = DecisionTransformer(
-#     state_dim=STATE_DIM,
-#     act_dim=ACT_DIM,
-#     max_length=max_length,
-#     max_ep_len=max_ep_len,
-#     hidden_size=variant['embed_dim'],
-#     n_layer=variant['n_layer'],
-#     n_head=variant['n_head'],
-#     n_inner=4*variant['embed_dim'],
-#     activation_function=variant['activation_function'],
-#     n_positions=1024,
-#     resid_pdrop=variant['dropout'],
-#     attn_pdrop=variant['dropout'],
-#     )
-
-
-
-
-
-
 

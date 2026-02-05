@@ -17,12 +17,12 @@ import utils.mpc_wrapper as mpc_wrapper
 import config.config_aliengo as config
 from timeit import default_timer as timer
 import pdb
-sys.path.append("algorithm")
+# sys.path.append("algorithm")
 import algorithm.fcn as fcn
 import algorithm.memory as memory
 from algorithm.init import StochasticDecisionTransformer
 from transformers import DecisionTransformerConfig, DecisionTransformerModel
-from sophia import SophiaG
+from algorithm.guro import GuRO
 
 def get_model_input_observation(obs, dtype, device):
     return torch.tensor(np.concatenate([
@@ -131,7 +131,7 @@ class MPCGuidanceAgent:
         self._init_model()
         
         # Initialize optimizer
-        self.optimizer = SophiaG(self.model.parameters(), lr=self.cfg["learning_rate"])
+        self.optimizer = GuRO(self.model.parameters(), lr=self.cfg["learning_rate"])
         
         # Training tracking
         self.running_loss = torch.tensor([], dtype=self.dtype, device=self.device)
@@ -425,7 +425,7 @@ def main():
         # Training
         if counter >= agent.cfg["learning_starts"] and len(agent.replay_memory) > agent.cfg["batch_size"]:
             # print(counter)
-            if counter % agent.cfg["train_freq"] = 0:
+            if counter % agent.cfg["train_freq"] == 0:
                 agent.update()
                 agent.save_loss()
                 print(f"Step {counter} | Memory size: {len(agent.replay_memory)} | Latest loss: {agent.running_loss[-1].item():.4f} | Latest Entropy: {agent.running_entropy[-1].item():.4f}")

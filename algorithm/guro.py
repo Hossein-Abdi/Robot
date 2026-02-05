@@ -5,7 +5,7 @@ from torch.optim.optimizer import Optimizer
 from typing import List, Optional
 
 
-class SophiaG(Optimizer):
+class GuRO(Optimizer):
     def __init__(self, params, lr=1e-4, betas=(0.965, 0.99), rho = 0.04,
          weight_decay=1e-1, *, maximize: bool = False,
          capturable: bool = False):
@@ -22,7 +22,7 @@ class SophiaG(Optimizer):
         defaults = dict(lr=lr, betas=betas, rho=rho, 
                         weight_decay=weight_decay, 
                         maximize=maximize, capturable=capturable)
-        super(SophiaG, self).__init__(params, defaults)
+        super(GuRO, self).__init__(params, defaults)
 
     def __setstate__(self, state):
         super().__setstate__(state)
@@ -97,7 +97,7 @@ class SophiaG(Optimizer):
                 if self.defaults['capturable']:
                     bs = torch.ones((1,), dtype=torch.float, device=p.device) * bs
 
-            sophiag(params_with_grad,
+            guro(params_with_grad,
                   grads,
                   exp_avgs,
                   hessian,
@@ -113,7 +113,7 @@ class SophiaG(Optimizer):
 
         return loss
 
-def sophiag(params: List[Tensor],
+def guro(params: List[Tensor],
           grads: List[Tensor],
           exp_avgs: List[Tensor],
           hessian: List[Tensor],
@@ -132,7 +132,7 @@ def sophiag(params: List[Tensor],
         raise RuntimeError("API has changed, `state_steps` argument must contain a list of singleton tensors")
 
     
-    func = _single_tensor_sophiag
+    func = _single_tensor_guro
 
     func(params,
          grads,
@@ -148,7 +148,7 @@ def sophiag(params: List[Tensor],
          maximize=maximize,
          capturable=capturable)
 
-def _single_tensor_sophiag(params: List[Tensor],
+def _single_tensor_guro(params: List[Tensor],
                          grads: List[Tensor],
                          exp_avgs: List[Tensor],
                          hessian: List[Tensor],
